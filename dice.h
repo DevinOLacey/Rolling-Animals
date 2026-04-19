@@ -4,13 +4,12 @@
 #include <string>
 #include <exception>
 #include <iostream>
-using namespace std;
 
-class DiceException : public exception {
+class DiceException : public std::exception {
 private:
-    string msg;
+    std::string msg;
 public:
-    DiceException(const string& m) : msg(m) {}
+    DiceException(const std::string& m) : msg(m) {}
     const char* what() const noexcept override { return msg.c_str(); }
 };
 
@@ -23,10 +22,10 @@ public:
 
     virtual int roll() const;
     int getSides() const { return sides; }
-    virtual string getType() const { return "Standard"; }
+    virtual std::string getType() const { return "Standard"; }
 
     virtual void printInfo() const {
-        cout << getType() << " Die (" << sides << " sides)\n";
+        std::cout << getType() << " Die (" << sides << " sides)\n";
     }
 };
 
