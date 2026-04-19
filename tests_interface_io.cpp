@@ -2,13 +2,14 @@
 
 #include <cmath>
 #include <cstdio>
+#include <exception>
 #include <iostream>
 #include <string>
 #include <vector>
 
 namespace {
 
-// Stops the test program right away if a check fails.
+// Stops the test program if a check fails.
 void require(bool condition, const std::string& message) {
     if (!condition) {
         std::cerr << "TEST FAILURE: " << message << "\n";
@@ -31,7 +32,7 @@ void testAnimalSaveLoadAndDuplicates() {
 
     AnimalDieData dog{{}, {3, 3, 3, 4, 5, 6}};
     dog.name = "dog";
-    require(appendAnimalDie(animalFile, dog), "animal file should append");
+    appendAnimalDie(animalFile, dog);
 
     std::vector<AnimalDieData> animals = loadAnimalDice(animalFile);
     require(animals.size() == 1, "one animal should load");
@@ -39,6 +40,91 @@ void testAnimalSaveLoadAndDuplicates() {
     require(animalExists(animals, " DOG "), "duplicate lookup should be case-insensitive");
 
     std::remove(animalFile.c_str());
+}
+
+// Tests that bad saved animal data throws a custom exception.
+void testInvalidAnimalDataThrows() {
+    const std::string animalFile = "test_invalid_animals.txt";
+    FILE* rawFile = std::fopen(animalFile.c_str(), "w");
+    require(rawFile != nullptr, "test should be able to create the invalid animal file");
+    std::fputs("name:Dog sides:1,2,three,4,5,6\n", rawFile);
+    std::fclose(rawFile);
+
+    bool threwExpectedException = false;
+    try {
+        loadAnimalDice(animalFile);
+    } catch (const FileDataException&) {
+        threwExpectedException = true;
+    }
+
+    require(threwExpectedException, "invalid animal data should throw FileDataException");
+    std::remove(animalFile.c_str());
+}
+
+// Tests that bad saved match history throws a custom exception.
+void testInvalidHistoryDataThrows() {
+    const std::string historyFile = "test_invalid_history.txt";
+    FILE* rawFile = std::fopen(historyFile.c_str(), "w");
+    require(rawFile != nullptr, "test should be able to create the invalid history file");
+    std::fputs("series_winner:Dog animal_a:Dog animal_b:Cat score:2-x games:[Dog|6|Cat|1]\n", rawFile);
+    std::fclose(rawFile);
+
+    bool threwExpectedException = false;
+    try {
+        loadSeriesHistory(historyFile);
+    } catch (const FileDataException&) {
+        threwExpectedException = true;
+    }
+
+    require(threwExpectedException, "invalid history data should throw FileDataException");
+    std::remove(historyFile.c_str());
+}
+
+// Tests that bad saved animal stats throw a custom exception.
+void testInvalidStatsDataThrows() {
+    const std::string statsFile = "test_invalid_stats.txt";
+    FILE* rawFile = std::fopen(statsFile.c_str(), "w");
+    require(rawFile != nullptr, "test should be able to create the invalid stats file");
+    std::fputs("name:Dog series_wins:1 series_losses:nope game_wins:2 game_losses:1 roll_sum:10 roll_count:2\n", rawFile);
+    std::fclose(rawFile);
+
+    bool threwExpectedException = false;
+    try {
+        loadAnimalRecords(statsFile);
+    } catch (const FileDataException&) {
+        threwExpectedException = true;
+    }
+
+    require(threwExpectedException, "invalid stats data should throw FileDataException");
+    std::remove(statsFile.c_str());
+}
+
+// Tests that invalid save/update inputs throw validation exceptions.
+void testValidationExceptions() {
+    bool animalValidationThrew = false;
+    try {
+        AnimalDieData badAnimal{{}, {0, 2, 3, 4, 5, 6}};
+        badAnimal.name = "Dog";
+        appendAnimalDie("test_should_not_write.txt", badAnimal);
+    } catch (const FileValidationException&) {
+        animalValidationThrew = true;
+    }
+    require(animalValidationThrew, "invalid animal die should throw FileValidationException");
+
+    bool seriesValidationThrew = false;
+    try {
+        SeriesRecord invalidSeries;
+        invalidSeries.seriesWinner = "Dog";
+        invalidSeries.animalA = "Dog";
+        invalidSeries.animalB = "Dog";
+        invalidSeries.animalAWins = 2;
+        invalidSeries.animalBWins = 0;
+        invalidSeries.games = {{"Dog", 6, "Dog", 1}};
+        appendSeriesRecord("test_should_not_write_history.txt", invalidSeries);
+    } catch (const FileValidationException&) {
+        seriesValidationThrew = true;
+    }
+    require(seriesValidationThrew, "invalid series should throw FileValidationException");
 }
 
 // Tests that animal stats update correctly after finished series
@@ -59,7 +145,7 @@ void testAnimalStatsUpdates() {
         {"Dog", 6, "Cat", 1}
     };
 
-    require(updateAnimalRecords(statsFile, record), "stats should update for a series");
+    updateAnimalRecords(statsFile, record);
 
     std::vector<AnimalRecord> records = loadAnimalRecords(statsFile);
     const AnimalRecord* dog = findAnimalRecord(records, "dog");
@@ -84,7 +170,7 @@ void testAnimalStatsUpdates() {
         {"Dog", 4, "Fox", 3}
     };
 
-    require(updateAnimalRecords(statsFile, followUp), "stats should support multiple series");
+    updateAnimalRecords(statsFile, followUp);
     records = loadAnimalRecords(statsFile);
     dog = findAnimalRecord(records, "Dog");
     require(dog != nullptr, "dog stats should still exist");
@@ -121,8 +207,8 @@ void testHistoryAppendLoadAndFilter() {
         {"Fox", 3, "Owl", 1}
     };
 
-    require(appendSeriesRecord(historyFile, dogVsCat), "history append should succeed");
-    require(appendSeriesRecord(historyFile, foxVsOwl), "second history append should succeed");
+    appendSeriesRecord(historyFile, dogVsCat);
+    appendSeriesRecord(historyFile, foxVsOwl);
 
     std::vector<SeriesRecord> records = loadSeriesHistory(historyFile);
     require(records.size() == 2, "two series should load");
@@ -143,6 +229,10 @@ void testHistoryAppendLoadAndFilter() {
 int main() {
     testNameNormalization();
     testAnimalSaveLoadAndDuplicates();
+    testInvalidAnimalDataThrows();
+    testInvalidHistoryDataThrows();
+    testInvalidStatsDataThrows();
+    testValidationExceptions();
     testAnimalStatsUpdates();
     testHistoryAppendLoadAndFilter();
 

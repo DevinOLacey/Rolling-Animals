@@ -93,6 +93,48 @@ AnimalRecord makeDefaultRecord(const std::string& name) {
     return AnimalRecord{name, 0, 0, 0, 0, 0, 0};
 }
 
+void validateAnimalDieData(const AnimalDieData& animal) {
+    if (normalizeAnimalName(animal.name).empty()) {
+        throw FileValidationException("Animal name cannot be empty.");
+    }
+
+    for (int sideValue : animal.sideValues) {
+        if (sideValue < 1) {
+            throw FileValidationException("Animal die side values must be 1 or greater.");
+        }
+    }
+}
+
+void validateSeriesRecord(const SeriesRecord& record) {
+    if (normalizeAnimalName(record.animalA).empty() || normalizeAnimalName(record.animalB).empty()) {
+        throw FileValidationException("A saved series must contain two animal names.");
+    }
+
+    if (namesMatch(record.animalA, record.animalB)) {
+        throw FileValidationException("A series cannot use the same animal on both sides.");
+    }
+
+    if (record.games.empty()) {
+        throw FileValidationException("A saved series must contain at least one counted game.");
+    }
+
+    if (!namesMatch(record.seriesWinner, record.animalA) && !namesMatch(record.seriesWinner, record.animalB)) {
+        throw FileValidationException("Series winner must match one of the animals in the fight.");
+    }
+}
+
+void validateAnimalRecordData(const AnimalRecord& record) {
+    if (normalizeAnimalName(record.name).empty()) {
+        throw FileValidationException("Animal stats record name cannot be empty.");
+    }
+
+    if (record.seriesWins < 0 || record.seriesLosses < 0 ||
+        record.gameWins < 0 || record.gameLosses < 0 ||
+        record.rollSum < 0 || record.rollCount < 0) {
+        throw FileValidationException("Animal stats values cannot be negative.");
+    }
+}
+
 // Finds an animal's record in the vector.
 // If it does not exist yet, add a new empty record and return its index.
 std::size_t ensureRecordIndex(std::vector<AnimalRecord>& records, const std::string& name) {
@@ -145,9 +187,14 @@ bool namesMatch(const std::string& left, const std::string& right) {
 std::vector<AnimalDieData> loadAnimalDice(const std::string& filename) {
     std::vector<AnimalDieData> animals;
     std::ifstream file(filename);
+    if (!file) {
+        return animals;
+    }
     std::string line;
+    int lineNumber = 0;
 
     while (std::getline(file, line)) {
+        ++lineNumber;
         if (trim(line).empty()) {
             continue;
         }
@@ -156,32 +203,29 @@ std::vector<AnimalDieData> loadAnimalDice(const std::string& filename) {
         const std::string sidesValue = extractValue(line, "sides");
 
         if (nameValue.empty() || sidesValue.empty()) {
-            continue;
+            throw FileDataException("Invalid animal record in " + filename + " at line " + std::to_string(lineNumber) + ".");
         }
 
         std::vector<std::string> parts = split(sidesValue, ',');
         if (parts.size() != 6) {
             // Every animal die must have exactly 6 side values.
-            continue;
+            throw FileDataException("Animal die record in " + filename + " line " + std::to_string(lineNumber) + " does not contain exactly 6 side values.");
         }
 
         AnimalDieData animal;
         animal.name = decodeName(nameValue);
 
-        bool valid = true;
         for (std::size_t index = 0; index < animal.sideValues.size(); ++index) {
             try {
                 animal.sideValues[index] = std::stoi(parts[index]);
-            } catch (...) {
+            } catch (const std::exception&) {
                 // Skip this animal if any side value is not a valid number.
-                valid = false;
-                break;
+                throw FileDataException("Animal die record in " + filename + " line " + std::to_string(lineNumber) + " contains a side value that is not a valid number.");
             }
         }
 
-        if (valid) {
-            animals.push_back(animal);
-        }
+        validateAnimalDieData(animal);
+        animals.push_back(animal);
     }
 
     return animals;
@@ -198,10 +242,12 @@ bool animalExists(const std::vector<AnimalDieData>& animals, const std::string& 
 }
 
 // Adds one new animal die to the end of the animal file.
-bool appendAnimalDie(const std::string& filename, const AnimalDieData& animal) {
+void appendAnimalDie(const std::string& filename, const AnimalDieData& animal) {
+    validateAnimalDieData(animal);
+
     std::ofstream file(filename, std::ios::app);
     if (!file) {
-        return false;
+        throw FileOpenException("Could not open " + filename + " for saving animal dice.");
     }
 
     file << "name:" << encodeName(animal.name) << " sides:";
@@ -214,16 +260,24 @@ bool appendAnimalDie(const std::string& filename, const AnimalDieData& animal) {
     }
     file << "\n";
 
-    return true;
+    if (!file) {
+        throw FileOpenException("Could not finish writing the animal die to " + filename + ".");
+    }
+
 }
 
 // Reads all finished series from the history file and rebuilds them in memory.
 std::vector<SeriesRecord> loadSeriesHistory(const std::string& filename) {
     std::vector<SeriesRecord> records;
     std::ifstream file(filename);
+    if (!file) {
+        return records;
+    }
     std::string line;
+    int lineNumber = 0;
 
     while (std::getline(file, line)) {
+        ++lineNumber;
         if (trim(line).empty()) {
             continue;
         }
@@ -237,20 +291,20 @@ std::vector<SeriesRecord> loadSeriesHistory(const std::string& filename) {
         const std::string score = extractValue(line, "score");
         std::size_t dash = score.find('-');
         if (dash == std::string::npos) {
-            continue;
+            throw FileDataException("Series record in " + filename + " line " + std::to_string(lineNumber) + " has an invalid score.");
         }
 
         try {
             record.animalAWins = std::stoi(score.substr(0, dash));
             record.animalBWins = std::stoi(score.substr(dash + 1));
-        } catch (...) {
-            continue;
+        } catch (const std::exception&) {
+            throw FileDataException("Series record in " + filename + " line " + std::to_string(lineNumber) + " contains a score that is not numeric.");
         }
 
         const std::string gamesValue = extractValue(line, "games");
         // The saved game list should be inside square brackets.
         if (gamesValue.size() < 2 || gamesValue.front() != '[' || gamesValue.back() != ']') {
-            continue;
+            throw FileDataException("Series record in " + filename + " line " + std::to_string(lineNumber) + " is missing a valid game list.");
         }
 
         const std::string contents = gamesValue.substr(1, gamesValue.size() - 2);
@@ -260,7 +314,7 @@ std::vector<SeriesRecord> loadSeriesHistory(const std::string& filename) {
                 // Each saved game stores: winner name | winner roll | loser name | loser roll
                 std::vector<std::string> parts = split(gameText, '|');
                 if (parts.size() != 4) {
-                    continue;
+                    throw FileDataException("Series record in " + filename + " line " + std::to_string(lineNumber) + " contains an invalid saved game.");
                 }
 
                 try {
@@ -270,12 +324,13 @@ std::vector<SeriesRecord> loadSeriesHistory(const std::string& filename) {
                         decodeName(parts[2]),
                         std::stoi(parts[3])
                     });
-                } catch (...) {
-                    continue;
+                } catch (const std::exception&) {
+                    throw FileDataException("Series record in " + filename + " line " + std::to_string(lineNumber) + " contains a game with invalid numeric values.");
                 }
             }
         }
 
+        validateSeriesRecord(record);
         records.push_back(record);
     }
 
@@ -283,10 +338,12 @@ std::vector<SeriesRecord> loadSeriesHistory(const std::string& filename) {
 }
 
 // Adds one finished series to the end of the history file.
-bool appendSeriesRecord(const std::string& filename, const SeriesRecord& record) {
+void appendSeriesRecord(const std::string& filename, const SeriesRecord& record) {
+    validateSeriesRecord(record);
+
     std::ofstream file(filename, std::ios::app);
     if (!file) {
-        return false;
+        throw FileOpenException("Could not open " + filename + " for saving match history.");
     }
 
     file << "series_winner:" << encodeName(record.seriesWinner)
@@ -309,7 +366,9 @@ bool appendSeriesRecord(const std::string& filename, const SeriesRecord& record)
     }
 
     file << "]\n";
-    return true;
+    if (!file) {
+        throw FileOpenException("Could not finish writing the match history to " + filename + ".");
+    }
 }
 
 // Returns only the series that include the requested animal.
@@ -332,15 +391,20 @@ std::vector<SeriesRecord> filterSeriesByAnimal(
 std::vector<AnimalRecord> loadAnimalRecords(const std::string& filename) {
     std::vector<AnimalRecord> records;
     std::ifstream file(filename);
+    if (!file) {
+        return records;
+    }
     std::string line;
+    int lineNumber = 0;
 
     while (std::getline(file, line)) {
+        ++lineNumber;
         if (trim(line).empty()) {
             continue;
         }
 
         try {
-            records.push_back(AnimalRecord{
+            AnimalRecord record{
                 decodeName(extractValue(line, "name")),
                 std::stoi(extractValue(line, "series_wins")),
                 std::stoi(extractValue(line, "series_losses")),
@@ -348,10 +412,14 @@ std::vector<AnimalRecord> loadAnimalRecords(const std::string& filename) {
                 std::stoi(extractValue(line, "game_losses")),
                 std::stoi(extractValue(line, "roll_sum")),
                 std::stoi(extractValue(line, "roll_count"))
-            });
-        } catch (...) {
+            };
+            validateAnimalRecordData(record);
+            records.push_back(record);
+        } catch (const FileValidationException&) {
+            throw;
+        } catch (const std::exception&) {
             // Skip lines that do not contain valid numeric stat values.
-            continue;
+            throw FileDataException("Animal stats record in " + filename + " line " + std::to_string(lineNumber) + " contains invalid numeric values.");
         }
     }
 
@@ -359,13 +427,14 @@ std::vector<AnimalRecord> loadAnimalRecords(const std::string& filename) {
 }
 
 // Rewrites the full stats file using the records currently in memory.
-bool saveAnimalRecords(const std::string& filename, const std::vector<AnimalRecord>& records) {
+void saveAnimalRecords(const std::string& filename, const std::vector<AnimalRecord>& records) {
     std::ofstream file(filename);
     if (!file) {
-        return false;
+        throw FileOpenException("Could not open " + filename + " for saving animal records.");
     }
 
     for (const AnimalRecord& record : records) {
+        validateAnimalRecordData(record);
         file << "name:" << encodeName(record.name)
              << " series_wins:" << record.seriesWins
              << " series_losses:" << record.seriesLosses
@@ -376,7 +445,10 @@ bool saveAnimalRecords(const std::string& filename, const std::vector<AnimalReco
              << "\n";
     }
 
-    return true;
+    if (!file) {
+        throw FileOpenException("Could not finish writing animal records to " + filename + ".");
+    }
+
 }
 
 // Finds an animal record by name and returns a pointer to it.
@@ -405,7 +477,8 @@ const AnimalRecord* findAnimalRecord(const std::vector<AnimalRecord>& records, c
 // - series wins and losses
 // - individual game wins and losses
 // - total roll sum and roll count for average-roll calculations
-bool updateAnimalRecords(const std::string& filename, const SeriesRecord& record) {
+void updateAnimalRecords(const std::string& filename, const SeriesRecord& record) {
+    validateSeriesRecord(record);
     std::vector<AnimalRecord> records = loadAnimalRecords(filename);
 
     const std::size_t animalAIndex = ensureRecordIndex(records, record.animalA);
@@ -438,7 +511,7 @@ bool updateAnimalRecords(const std::string& filename, const SeriesRecord& record
         return left.name < right.name;
     });
 
-    return saveAnimalRecords(filename, records);
+    saveAnimalRecords(filename, records);
 }
 
 // Calculates the average of all recorded battle rolls for one animal.

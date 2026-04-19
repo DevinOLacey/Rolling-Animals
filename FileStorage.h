@@ -4,8 +4,29 @@
 // Used for saved dice, match history, and animal stats.
 
 #include <array>
+#include <stdexcept>
 #include <string>
 #include <vector>
+
+class FileStorageException : public std::runtime_error {
+public:
+    explicit FileStorageException(const std::string& message) : std::runtime_error(message) {}
+};
+
+class FileOpenException : public FileStorageException {
+public:
+    explicit FileOpenException(const std::string& message) : FileStorageException(message) {}
+};
+
+class FileDataException : public FileStorageException {
+public:
+    explicit FileDataException(const std::string& message) : FileStorageException(message) {}
+};
+
+class FileValidationException : public FileStorageException {
+public:
+    explicit FileValidationException(const std::string& message) : FileStorageException(message) {}
+};
 
 // Stores one animal die.
 // Each animal has a name and exactly 6 side values.
@@ -54,11 +75,11 @@ bool namesMatch(const std::string& left, const std::string& right);
 // Functions for reading and writing saved animal dice.
 std::vector<AnimalDieData> loadAnimalDice(const std::string& filename);
 bool animalExists(const std::vector<AnimalDieData>& animals, const std::string& name);
-bool appendAnimalDie(const std::string& filename, const AnimalDieData& animal);
+void appendAnimalDie(const std::string& filename, const AnimalDieData& animal);
 
 // Functions for reading, saving, and filtering completed match history.
 std::vector<SeriesRecord> loadSeriesHistory(const std::string& filename);
-bool appendSeriesRecord(const std::string& filename, const SeriesRecord& record);
+void appendSeriesRecord(const std::string& filename, const SeriesRecord& record);
 std::vector<SeriesRecord> filterSeriesByAnimal(
     const std::vector<SeriesRecord>& records,
     const std::string& animalName
@@ -66,8 +87,8 @@ std::vector<SeriesRecord> filterSeriesByAnimal(
 
 // Functions for reading, saving, and updating overall animal stats.
 std::vector<AnimalRecord> loadAnimalRecords(const std::string& filename);
-bool saveAnimalRecords(const std::string& filename, const std::vector<AnimalRecord>& records);
-bool updateAnimalRecords(const std::string& filename, const SeriesRecord& record);
+void saveAnimalRecords(const std::string& filename, const std::vector<AnimalRecord>& records);
+void updateAnimalRecords(const std::string& filename, const SeriesRecord& record);
 AnimalRecord* findAnimalRecord(std::vector<AnimalRecord>& records, const std::string& name);
 const AnimalRecord* findAnimalRecord(const std::vector<AnimalRecord>& records, const std::string& name);
 double computeAverageRoll(const AnimalRecord& record);
