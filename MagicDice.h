@@ -4,18 +4,31 @@
 #include "Dice.h"
 #include <string>
 
-// Base class for all magic dice types
 class MagicDice : public Die {
 public:
     MagicDice(int sides = 6) : Die(sides) {}
     virtual ~MagicDice() = default;
 
-    // Every magic die MUST define its own effect
+    // Effect logic
     virtual int applyEffect(int playerRoll, int opponentRoll) const = 0;
 
-    virtual std::string getType() const {
-        return "Magic";
-    }
+    // Check if the die is a mirror
+    virtual bool isMirror() const { return false; }
+
+    // Check if the die is a break
+    virtual bool isBreak() const { return false; }
+
+    // Name of the die
+    virtual std::string getType() const = 0;
+
+    // Category (used for activation rules)
+    virtual std::string getCategory() const = 0;
+
+    // Roll a d10 for activation
+    int rollActivation() const;
+
+    // Check if activation succeeds
+    bool checkActivation(int roll) const;
 };
 
 #endif
