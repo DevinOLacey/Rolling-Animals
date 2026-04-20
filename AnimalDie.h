@@ -7,7 +7,7 @@
 class AnimalDie : public Die {
 
 protected:
-    std::string animalName;   // name/type of animal (Lion, Tiger, etc.)
+    std::string animalType;   // Type of animal (Lion, Tiger, etc.)
     int animalValues[6];      // Values for each side of the die
 
 public:
