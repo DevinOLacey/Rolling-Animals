@@ -3,7 +3,7 @@
 #include <fstream>
 #include <cstdlib>
 
-// Default constructor (standard 1�6 die)
+// Default constructor (standard 1–6 die)
 AnimalDie::AnimalDie() : Die(6), animalType("Default") {
     for (int i = 0; i < 6; i++) {
         animalValues[i] = i + 1;
