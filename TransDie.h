@@ -31,7 +31,7 @@ public:
 class PillarDice : public MagicDice {
 public:
     int applyEffect(int playerRoll, int) const override {
-        return 7 - playerRoll;
+        return playerRoll + (7 - playerRoll);
     }
 
     std::string getType() const override { return "Pillar"; }
