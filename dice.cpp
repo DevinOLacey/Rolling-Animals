@@ -2,8 +2,8 @@
 #include <cstdlib> // for rand()
 
 Die::Die(int s) {
-    if (s < 2) {
-        throw DiceException("Die must have at least 2 sides.");
+    if (s < 1) {
+        throw DiceException("Die must have at least 1 side.");
     }
     sides = s;
 }
