@@ -14,6 +14,7 @@
 #include <limits>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -34,6 +35,30 @@ namespace {
         case 6: return new MirrorDice();
         case 7: return new BreakDice();
         default: return nullptr;
+        }
+    }
+
+    MagicDice* createRandomMagicDice() {
+        return createMagicDice((rand() % 7) + 1);
+    }
+
+    bool promptForYesNo(const std::string& message) {
+        char choice;
+        while (true) {
+            std::cout << message;
+            if (std::cin >> choice) {
+                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+                if (choice == 'y' || choice == 'Y') {
+                    return true;
+                }
+                if (choice == 'n' || choice == 'N') {
+                    return false;
+                }
+            } else {
+                std::cin.clear();
+                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            }
+            std::cout << "Please enter y or n.\n";
         }
     }
 
@@ -130,26 +155,30 @@ namespace {
 
             //  MAGIC SELECTION 
 
-            int choiceA = 0;
+            bool useMagicA = false;
             if (!aUsedMagic) {
-                std::cout << animalA.name << " choose magic (0-9): ";
-                choiceA = promptForInteger("", 0, 9);
+                useMagicA = promptForYesNo(animalA.name + " use magic this game? (y/n): ");
+                if (useMagicA) {
+                    aUsedMagic = true;
+                }
             }
             else {
                 std::cout << animalA.name << " has already used magic this series.\n";
             }
 
-            int choiceB = 0;
+            bool useMagicB = false;
             if (!bUsedMagic) {
-                std::cout << animalB.name << " choose magic (0-9): ";
-                choiceB = promptForInteger("", 0, 9);
+                useMagicB = promptForYesNo(animalB.name + " use magic this game? (y/n): ");
+                if (useMagicB) {
+                    bUsedMagic = true;
+                }
             }
             else {
                 std::cout << animalB.name << " has already used magic this series.\n";
             }
 
-            MagicDice* magicA = createMagicDice(choiceA);
-            MagicDice* magicB = createMagicDice(choiceB);
+            MagicDice* magicA = useMagicA ? createRandomMagicDice() : nullptr;
+            MagicDice* magicB = useMagicB ? createRandomMagicDice() : nullptr;
 
             bool aActive = false;
             bool bActive = false;
@@ -158,14 +187,20 @@ namespace {
 
             if (magicA) {
                 int roll = magicA->rollActivation();
-                std::cout << animalA.name << " rolled " << roll << " for magic\n";
+                std::cout << animalA.name << " rolled " << roll << " for " << magicA->getType() << " magic\n";
                 aActive = magicA->checkActivation(roll);
+                if (!aActive) {
+                    std::cout << animalA.name << "'s magic did not activate.\n";
+                }
             }
 
             if (magicB) {
                 int roll = magicB->rollActivation();
-                std::cout << animalB.name << " rolled " << roll << " for magic\n";
+                std::cout << animalB.name << " rolled " << roll << " for " << magicB->getType() << " magic\n";
                 bActive = magicB->checkActivation(roll);
+                if (!bActive) {
+                    std::cout << animalB.name << "'s magic did not activate.\n";
+                }
             }
 
             //  BREAK 
@@ -201,11 +236,6 @@ namespace {
             if (bActive && magicB && !magicB->isMirror() && !magicB->isBreak()) {
                 animalBRoll = magicB->applyEffect(animalBRoll, animalARoll);
             }
-
-            //  MARK COOLDOWN 
-
-            if (aActive) aUsedMagic = true;
-            if (bActive) bUsedMagic = true;
 
             // CLEANUP 
 
@@ -400,42 +430,43 @@ namespace {
         // If choice == 0, just return to main menu
     }
 
-    //  MAIN, where the magic happens, aka the main menu loop and function calls, also initializes random seed for die rolls
-
-    int main() {
-        srand(static_cast<unsigned int>(time(nullptr)));
-
-        bool running = true;
-        printTitle();
-
-        while (running) {
-            printMainMenu();
-            int choice = promptForInteger("", 0, 4);
-
-            if (choice == 1) {
-                fightAnimals();
-                waitForEnter();
-            }
-            else if (choice == 2) {
-                createDie();
-                waitForEnter();
-            }
-            else if (choice == 3) {
-                viewAnimalDice();
-                waitForEnter();
-            }
-            else if (choice == 4) {
-                viewMatchHistoryMenu();
-                waitForEnter();
-            }
-            else if (choice == 0) {
-                running = false;
-            }
-        }
-
-        // Cleanup and exit 
-        printDivider();
-        std::cout << "Closing prototype.\n";
-        return 0;
-    }
 } // closing brace for name space
+
+//  MAIN, where the magic happens, aka the main menu loop and function calls, also initializes random seed for die rolls
+
+int main() {
+    srand(static_cast<unsigned int>(time(nullptr)));
+
+    bool running = true;
+    printTitle();
+
+    while (running) {
+        printMainMenu();
+        int choice = promptForInteger("", 0, 4);
+
+        if (choice == 1) {
+            fightAnimals();
+            waitForEnter();
+        }
+        else if (choice == 2) {
+            createDie();
+            waitForEnter();
+        }
+        else if (choice == 3) {
+            viewAnimalDice();
+            waitForEnter();
+        }
+        else if (choice == 4) {
+            viewMatchHistoryMenu();
+            waitForEnter();
+        }
+        else if (choice == 0) {
+            running = false;
+        }
+    }
+
+    // Cleanup and exit
+    printDivider();
+    std::cout << "Closing prototype.\n";
+    return 0;
+}

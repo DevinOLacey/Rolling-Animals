@@ -1,3 +1,4 @@
-name:Bird series_wins:3 series_losses:0 game_wins:6 game_losses:1 roll_sum:28 roll_count:7
-name:Cat series_wins:0 series_losses:3 game_wins:3 game_losses:6 roll_sum:33 roll_count:9
+name:Bird series_wins:3 series_losses:1 game_wins:6 game_losses:3 roll_sum:36 roll_count:9
+name:Cat series_wins:0 series_losses:4 game_wins:4 game_losses:8 roll_sum:44 roll_count:12
 name:Dog series_wins:2 series_losses:2 game_wins:4 game_losses:6 roll_sum:37 roll_count:10
+name:Rattle_Snake series_wins:2 series_losses:0 game_wins:4 game_losses:1 roll_sum:34 roll_count:5
