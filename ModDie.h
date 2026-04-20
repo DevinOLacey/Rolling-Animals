@@ -1,61 +1,35 @@
-#ifndef MODIFIER_DICE_H
-#define MODIFIER_DICE_H
+#ifndef MOD_DIE_H
+#define MOD_DIE_H
 
 #include "MagicDice.h"
 
-// Base for dice that modify player roll
-class ModifierDice : public MagicDice {
-protected:
+
+// Boost adds a flat amount to the player's roll
+class BoostDice : public MagicDice {
+private:
     int power;
 
 public:
-    ModifierDice(int p = 1) : power(p) {}
-
-    std::string getType() const override {
-        return "Modifier";
-    }
-};
-
-// BOOST
-class BoostDice : public ModifierDice {
-public:
-    BoostDice(int p = 2) : ModifierDice(p) {}
+    BoostDice(int p = 2) : power(p) {}
 
     int applyEffect(int playerRoll, int) const override {
         return playerRoll + power;
     }
 
-    std::string getType() const override {
-        return "Boost";
-    }
+    std::string getType() const override { return "Boost"; }
+    std::string getCategory() const override { return "Modifier"; }
 };
 
-// SHIELD
-class ShieldDice : public ModifierDice {
+// Shield reduces the opponent's roll by a flat amount (handled in main logic)
+class ShieldDice : public MagicDice {
 public:
-    ShieldDice(int p = 2) : ModifierDice(p) {}
-
     int applyEffect(int playerRoll, int) const override {
-        return playerRoll;
+        return playerRoll; // handled in main logic
     }
 
-    std::string getType() const override {
-        return "Shield";
-    }
+    std::string getType() const override { return "Shield"; }
+    std::string getCategory() const override { return "Modifier"; }
 };
 
-// BURN
-class BurnDice : public ModifierDice {
-public:
-    BurnDice(int p = 3) : ModifierDice(p) {}
-
-    int applyEffect(int playerRoll, int) const override {
-        return playerRoll + power;
-    }
-
-    std::string getType() const override {
-        return "Burn";
-    }
-};
 
 #endif
