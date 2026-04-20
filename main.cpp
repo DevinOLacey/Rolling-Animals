@@ -1,5 +1,11 @@
 #include "FileStorage.h"
 
+#include "MagicDice.h"
+#include "ModDie.h"
+#include "OppDice.h"
+#include "TransDie.h"
+// No use making seprate headers for each magic die if they are all pretty simple and just override the same functions, might as well just put them like three headers for simplicity
+
 #include <array>
 #include <cstdlib>
 #include <ctime>
@@ -12,486 +18,424 @@
 
 namespace {
 
-// These are the text files the program uses to save data.
-// ZooBox.txt stores the animal dice.
-// Results.txt stores the history of finished fights.
-// AnimalRecords.txt stores the running win/loss stats for each animal.
-const std::string kAnimalFile = "ZooBox.txt";
-const std::string kHistoryFile = "Results.txt";
-const std::string kStatsFile = "AnimalRecords.txt";
 
-// Prints a line across the screen to make the menu easier to read.
-void printDivider() {
-    std::cout << "\n============================================================\n";
-}
 
-// Prints the program title at the top of the screen.
-void printTitle() {
-    printDivider();
-    std::cout << "                  ANIMAL DIE BATTLE INTERFACE               \n";
-    printDivider();
-}
 
-// Shows the main menu options the user can choose from.
-void printMainMenu() {
-    std::cout << "\nMain Menu\n";
-    std::cout << "1. Fight\n";
-    std::cout << "2. Create a die\n";
-    std::cout << "3. View animal dice\n";
-    std::cout << "4. View previous matches / look up animal stats\n";
-    std::cout << "0. Exit\n";
-    std::cout << "Choose an option: ";
-}
 
-// Waits for the user to press Enter before clearing the screen.
-void waitForEnter() {
-    std::cout << "\nPress Enter to continue...";
-    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-    // "cls" clears the terminal.
-    std::system("cls");
-}
+    // MAGIC HELPER FUNCTION, creates a magic die based on the player's choice, returns nullptr if no magic is chosen or if the choice is invalid
 
-// Keeps asking the user for a number until they enter a valid one that is inside the allowed range.
-int promptForInteger(const std::string& message, int minValue, int maxValue) {
-    int value;
-
-    while (true) {
-        std::cout << message;
-
-        if (std::cin >> value && value >= minValue && value <= maxValue) {
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-            return value;
+    MagicDice* createMagicDice(int choice) {
+        switch (choice) {
+        case 1: return new BoostDice();
+        case 2: return new ShieldDice();
+        case 3: return new FlipDice();
+        case 4: return new RerollDice();
+        case 5: return new PillarDice();
+        case 6: return new MirrorDice();
+        case 7: return new BreakDice();
+        default: return nullptr;
         }
+    }
 
-        std::cout << "Please enter a number from " << minValue << " to " << maxValue << ".\n";
-        // Clear the error state so cin can be used again.
-        std::cin.clear();
-        // Throw away the rest of the bad input line.
+    // EXISTING CODE, just moved down here for better organization
+
+    // File paths zoobox is where the animal dice are stored, results is where the match history is stored, and animarecords is where the individual animal stats are stored (total wins, losses, etc.)
+
+    const std::string kAnimalFile = "ZooBox.txt";
+    const std::string kHistoryFile = "Results.txt";
+    const std::string kStatsFile = "AnimalRecords.txt";
+
+    void printDivider() {
+        std::cout << "\n============================================================\n";
+    }
+
+    void printTitle() {
+        printDivider();
+        std::cout << "                  ANIMAL DIE BATTLE INTERFACE               \n";
+        printDivider();
+    }
+
+    // Main menu display
+    void printMainMenu() {
+        std::cout << "\nMain Menu\n";
+        std::cout << "1. Fight\n";
+        std::cout << "2. Create a die\n";
+        std::cout << "3. View animal dice\n";
+        std::cout << "4. View previous matches / look up animal stats\n";
+        std::cout << "0. Exit\n";
+        std::cout << "Choose an option: ";
+    }
+
+    void waitForEnter() {
+        std::cout << "\nPress Enter to continue...";
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::system("cls");
     }
-}
 
-// Keeps asking for text until the user enters something that is not blank.
-std::string promptForText(const std::string& message) {
-    std::string value;
+    int promptForInteger(const std::string& message, int minValue, int maxValue) {
+        int value;
+        while (true) {
+            std::cout << message;
+            if (std::cin >> value && value >= minValue && value <= maxValue) {
+                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+                return value;
+            }
+            std::cout << "Please enter a number from " << minValue << " to " << maxValue << ".\n";
+            std::cin.clear();
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        }
+    }
 
-    while (true) {
-        std::cout << message;
-        std::getline(std::cin, value);
+    // Formats the animal die's name and side values into a readable string
+    std::string formatSideValues(const AnimalDieData& animal) {
+        std::ostringstream output;
+        output << animal.name << " d6";
+        for (std::size_t i = 0; i < animal.sideValues.size(); ++i) {
+            output << " s" << i + 1 << ":" << animal.sideValues[i];
+        }
+        return output.str();
+    }
 
-        // normalizeAnimalName removes extra spaces, so a line of only spaces should still count as empty input.
-        if (!normalizeAnimalName(value).empty()) {
-            return value;
+    // Rolls the animal die by randomly selecting one of its side values
+    int rollAnimalDie(const AnimalDieData& animal) {
+        int index = rand() % 6;
+        return animal.sideValues[index];
+    }
+
+  
+
+    // FIGHT LOGIC, runs a best of three series between two animal dice, with the new magic die mechanics integrated, and returns a record of the series for storage in the match history
+
+    SeriesRecord runBestOfThreeSeries(const AnimalDieData& animalA, const AnimalDieData& animalB) {
+        SeriesRecord record;
+        record.animalA = animalA.name;
+        record.animalB = animalB.name;
+        record.animalAWins = 0;
+        record.animalBWins = 0;
+
+        // 🔥 NEW: magic cooldown tracking
+        bool aUsedMagic = false;
+        bool bUsedMagic = false;
+
+        int gameNumber = 1;
+
+        while (record.animalAWins < 2 && record.animalBWins < 2) {
+
+            int animalARoll = rollAnimalDie(animalA);
+            int animalBRoll = rollAnimalDie(animalB);
+
+            std::cout << "\nGame " << gameNumber << " Base Rolls: "
+                << animalA.name << " = " << animalARoll << ", "
+                << animalB.name << " = " << animalBRoll << "\n";
+
+            //  MAGIC SELECTION 
+
+            int choiceA = 0;
+            if (!aUsedMagic) {
+                std::cout << animalA.name << " choose magic (0-9): ";
+                choiceA = promptForInteger("", 0, 9);
+            }
+            else {
+                std::cout << animalA.name << " has already used magic this series.\n";
+            }
+
+            int choiceB = 0;
+            if (!bUsedMagic) {
+                std::cout << animalB.name << " choose magic (0-9): ";
+                choiceB = promptForInteger("", 0, 9);
+            }
+            else {
+                std::cout << animalB.name << " has already used magic this series.\n";
+            }
+
+            MagicDice* magicA = createMagicDice(choiceA);
+            MagicDice* magicB = createMagicDice(choiceB);
+
+            bool aActive = false;
+            bool bActive = false;
+
+            //  ACTIVATION 
+
+            if (magicA) {
+                int roll = magicA->rollActivation();
+                std::cout << animalA.name << " rolled " << roll << " for magic\n";
+                aActive = magicA->checkActivation(roll);
+            }
+
+            if (magicB) {
+                int roll = magicB->rollActivation();
+                std::cout << animalB.name << " rolled " << roll << " for magic\n";
+                bActive = magicB->checkActivation(roll);
+            }
+
+            //  BREAK 
+
+            if (aActive && magicA && magicA->isBreak()) {
+                std::cout << animalA.name << " used BREAK! Opponent magic canceled.\n";
+                bActive = false;
+            }
+
+            if (bActive && magicB && magicB->isBreak()) {
+                std::cout << animalB.name << " used BREAK! Opponent magic canceled.\n";
+                aActive = false;
+            }
+
+            //  mirror/swap cause it was basically the same 
+
+            if (aActive && magicA && magicA->isMirror()) {
+                std::cout << animalA.name << " used Mirror!\n";
+                std::swap(animalARoll, animalBRoll);
+            }
+
+            if (bActive && magicB && magicB->isMirror()) {
+                std::cout << animalB.name << " used Mirror!\n";
+                std::swap(animalARoll, animalBRoll);
+            }
+
+            //  OTHER EFFECTS 
+
+            if (aActive && magicA && !magicA->isMirror() && !magicA->isBreak()) {
+                animalARoll = magicA->applyEffect(animalARoll, animalBRoll);
+            }
+
+            if (bActive && magicB && !magicB->isMirror() && !magicB->isBreak()) {
+                animalBRoll = magicB->applyEffect(animalBRoll, animalARoll);
+            }
+
+            //  MARK COOLDOWN 
+
+            if (aActive) aUsedMagic = true;
+            if (bActive) bUsedMagic = true;
+
+            // CLEANUP 
+
+            delete magicA;
+            delete magicB;
+
+            // FINAL RESULT 
+
+            std::cout << "Final Rolls: "
+                << animalA.name << " = " << animalARoll << ", "
+                << animalB.name << " = " << animalBRoll << "\n";
+
+            if (animalARoll == animalBRoll) {
+                std::cout << "Tie! Rerolling...\n";
+                continue;
+            }
+
+            GameResult game;
+
+            if (animalARoll > animalBRoll) {
+                ++record.animalAWins;
+                game = GameResult{ animalA.name, animalARoll, animalB.name, animalBRoll };
+            }
+            else {
+                ++record.animalBWins;
+                game = GameResult{ animalB.name, animalBRoll, animalA.name, animalARoll };
+            }
+
+            record.games.push_back(game);
+
+            std::cout << animalA.name << " vs " << animalB.name
+                << " -> " << game.winnerName
+                << " wins with " << game.winnerRoll << "\n\n";
+
+            ++gameNumber;
         }
 
-        std::cout << "Input cannot be empty.\n";
-    }
-}
+        record.seriesWinner = (record.animalAWins > record.animalBWins)
+            ? animalA.name
+            : animalB.name;
 
-// Builds one readable line that shows an animal's name and all 6 values on its die.
-std::string formatSideValues(const AnimalDieData& animal) {
-    std::ostringstream output;
-    output << animal.name << " d6";
-
-    for (std::size_t index = 0; index < animal.sideValues.size(); ++index) {
-        output << " s" << index + 1 << ":" << animal.sideValues[index];
+        return record;
     }
 
-    return output.str();
-}
-
-// Picks one of the 6 sides at random and returns that value.
-int rollAnimalDie(const AnimalDieData& animal) {
-    int sideIndex = rand() % static_cast<int>(animal.sideValues.size());
-    return animal.sideValues[static_cast<std::size_t>(sideIndex)];
-}
-
-// Loads every saved animal die from the file and prints them to the screen.
-void viewAnimalDice() {
-    try {
-        printDivider();
-        std::cout << "Animal Dice\n";
-
-        const std::vector<AnimalDieData> animals = loadAnimalDice(kAnimalFile);
-        if (animals.empty()) {
-            std::cout << "No animal dice have been created yet.\n";
-            return;
-        }
-
-        for (std::size_t index = 0; index < animals.size(); ++index) {
-            std::cout << index + 1 << ". " << formatSideValues(animals[index]) << "\n";
-        }
-    } catch (const FileDataException& ex) {
-        std::cout << "Saved data error: " << ex.what() << "\n";
-    } catch (const std::exception& ex) {
-        std::cout << "Unexpected error: " << ex.what() << "\n";
-    }
-}
-
-// Lets the user create a new animal die, checks that the name is unique,
-// and saves it to the animal file.
-void createDie() {
-    try {
-        printDivider();
-        std::cout << "Create A Die\n";
-
+    // Function to handle the "Fight" menu option, allowing the user to select two animal dice and run a best-of-three series.
+    void fightAnimals() {
+        // Load animal dice from file
         std::vector<AnimalDieData> animals = loadAnimalDice(kAnimalFile);
-        AnimalDieData newAnimal;
-        std::string rawName;
-
-        while (true) {
-            rawName = promptForText("Enter the animal name: ");
-            newAnimal.name = normalizeAnimalName(rawName);
-
-            // Do not allow two saved animals to have the same name.
-            if (animalExists(animals, newAnimal.name)) {
-                std::cout << "That animal name already exists. Choose a unique name.\n";
-            } else {
-                break;
-            }
-        }
-
-        std::cout << "All animal dice are d6.\n";
-        // Ask for the value on each of the 6 sides of the die.
-        for (std::size_t side = 0; side < newAnimal.sideValues.size(); ++side) {
-            newAnimal.sideValues[side] = promptForInteger(
-                "Enter value for side " + std::to_string(side + 1) + ": ",
-                1,
-                99
-            );
-        }
-
-        appendAnimalDie(kAnimalFile, newAnimal);
-
-        std::cout << "\nSaved:\n";
-        std::cout << formatSideValues(newAnimal) << "\n";
-    } catch (const FileOpenException& ex) {
-        std::cout << "File error: " << ex.what() << "\n";
-    } catch (const FileDataException& ex) {
-        std::cout << "Saved data error: " << ex.what() << "\n";
-    } catch (const FileValidationException& ex) {
-        std::cout << "Validation error: " << ex.what() << "\n";
-    } catch (const std::exception& ex) {
-        std::cout << "Unexpected error: " << ex.what() << "\n";
-    }
-}
-
-// Shows all saved animals, asks the user to pick one,
-// and returns its position in the vector.
-int promptForAnimalSelection(const std::vector<AnimalDieData>& animals, const std::string& message) {
-    for (std::size_t index = 0; index < animals.size(); ++index) {
-        std::cout << index + 1 << ". " << formatSideValues(animals[index]) << "\n";
-    }
-
-    return promptForInteger(message, 1, static_cast<int>(animals.size())) - 1;
-}
-
-// Runs a best-of-3 fight between two animals.
-// The first animal to win 2 games wins the series.
-// Tied rolls do not count and are rolled again.
-SeriesRecord runBestOfThreeSeries(const AnimalDieData& animalA, const AnimalDieData& animalB) {
-    SeriesRecord record;
-    record.animalA = animalA.name;
-    record.animalB = animalB.name;
-    record.animalAWins = 0;
-    record.animalBWins = 0;
-
-    int gameNumber = 1;
-    while (record.animalAWins < 2 && record.animalBWins < 2) {
-        int animalARoll = rollAnimalDie(animalA);
-        int animalBRoll = rollAnimalDie(animalB);
-
-        if (animalARoll == animalBRoll) {
-            // A tie does not count as a game win for either side.
-            std::cout << "Game " << gameNumber << ": " << animalA.name << " and " << animalB.name
-                      << " tied with " << animalARoll << ". Rerolling that game.\n\n";
-            continue;
-        }
-
-        GameResult game;
-        if (animalARoll > animalBRoll) {
-            ++record.animalAWins;
-            game = GameResult{animalA.name, animalARoll, animalB.name, animalBRoll};
-        } else {
-            ++record.animalBWins;
-            game = GameResult{animalB.name, animalBRoll, animalA.name, animalARoll};
-        }
-
-        // Save the result of this counted game so it can be written to Results.txt later.
-        record.games.push_back(game);
-
-        std::cout << "Game " << gameNumber << ": " << animalA.name << " vs " << animalB.name
-                  << " : " << game.winnerName << " wins with a " << game.winnerRoll
-                  << " beating " << game.loserName << "'s " << game.loserRoll << "\n\n";
-
-        ++gameNumber;
-    }
-
-    // After the loop ends, one animal must have won the series.
-    record.seriesWinner = (record.animalAWins > record.animalBWins) ? animalA.name : animalB.name;
-    return record;
-}
-
-// Prints the final result of the full best-of-3 series.
-void printSeriesSummary(const SeriesRecord& record) {
-    std::cout << "\nSeries Summary\n";
-    std::cout << record.animalA << " vs " << record.animalB << " -> "
-              << record.seriesWinner << " wins the series "
-              << record.animalAWins << "-" << record.animalBWins << "\n";
-}
-
-// Lets the user choose two saved animals, runs the fight,
-// saves the match history, and updates the running animal stats.
-void fightAnimals() {
-    try {
-        printDivider();
-        std::cout << "Fight\n";
-
-        const std::vector<AnimalDieData> animals = loadAnimalDice(kAnimalFile);
-        // A fight is only possible if at least two animals have been created.
         if (animals.size() < 2) {
-            throw FileValidationException("You need at least two saved animal dice before fighting.");
+            std::cout << "Not enough animal dice to fight. Please create more.\n";
+            return;
         }
 
-        std::cout << "Choose the first animal:\n";
-        const int firstIndex = promptForAnimalSelection(animals, "Choose a number: ");
-
-        int secondIndex = -1;
-        // Do not allow the same animal to fight itself.
-        while (true) {
-            std::cout << "\nChoose the second animal:\n";
-            secondIndex = promptForAnimalSelection(animals, "Choose a number: ");
-
-            if (secondIndex == firstIndex) {
-                std::cout << "Choose a different animal for the second fighter.\n";
-            } else {
-                break;
-            }
+        // Display available animal dice
+        std::cout << "\nAvailable Animal Dice:\n";
+        for (std::size_t i = 0; i < animals.size(); ++i) {
+            std::cout << i + 1 << ". " << formatSideValues(animals[i]) << "\n";
         }
 
-        std::cout << "\n";
-        SeriesRecord record = runBestOfThreeSeries(animals[static_cast<std::size_t>(firstIndex)], animals[static_cast<std::size_t>(secondIndex)]);
-        printSeriesSummary(record);
+        // Select animal A
+        int aIndex = promptForInteger("Select Animal A (1-" + std::to_string(animals.size()) + "): ", 1, static_cast<int>(animals.size())) - 1;
+        // Select animal B
+        int bIndex = promptForInteger("Select Animal B (1-" + std::to_string(animals.size()) + "): ", 1, static_cast<int>(animals.size())) - 1;
+        if (aIndex == bIndex) {
+            std::cout << "Cannot fight the same animal die against itself.\n";
+            return;
+        }
 
-        // Save this finished series to the match history file.
+        // Run the best-of-three series
+        SeriesRecord record = runBestOfThreeSeries(animals[aIndex], animals[bIndex]);
+
+        // Display series result
+        std::cout << "\nSeries Winner: " << record.seriesWinner << "\n";
+        std::cout << "Games:\n";
+        for (std::size_t i = 0; i < record.games.size(); ++i) {
+            const GameResult& g = record.games[i];
+            std::cout << "  Game " << i + 1 << ": " << g.winnerName << " (" << g.winnerRoll << ") defeated " << g.loserName << " (" << g.loserRoll << ")\n";
+        }
+
+        // Save match history
         appendSeriesRecord(kHistoryFile, record);
-
-        // Update the overall win/loss records and average roll data.
+        // Update animal stats
         updateAnimalRecords(kStatsFile, record);
-
-        std::cout << "Series history and animal records saved.\n";
-
-        
-        // --- MAGIC PHASE ---
-
-    std::cout << animalA.name << " choose magic die (0 for none):\n";
-    int choiceA = promptForInteger("", 0, 9);
-
-    MagicDice* magicA = createMagicDice(choiceA);
-
-    if (magicA) {
-        int roll = magicA->rollActivation();
-        std::cout << animalA.name << " rolled " << roll << " for magic activation.\n";
-
-    if (magicA->checkActivation(roll)) {
-        std::cout << "Magic activated: " << magicA->getType() << "\n";
-        animalARoll = magicA->applyEffect(animalARoll, animalBRoll);
-    } else {
-        std::cout << "Magic failed.\n";
     }
 
-    delete magicA;
-    }
+    // Function to handle creating a new animal die and saving it to file
+    void createDie() {
+        std::vector<AnimalDieData> animals = loadAnimalDice(kAnimalFile);
 
-// SAME FOR PLAYER B
-    std::cout << animalB.name << " choose magic die (0 for none):\n";
-    int choiceB = promptForInteger("", 0, 9);
+        std::string name;
+        std::cout << "\nEnter animal name: ";
+        std::getline(std::cin, name);
+        name = normalizeAnimalName(name);
 
-    MagicDice* magicB = createMagicDice(choiceB);
-
-    if (magicB) {
-        int roll = magicB->rollActivation();
-        std::cout << animalB.name << " rolled " << roll << " for magic activation.\n";
-
-    if (magicB->checkActivation(roll)) {
-        std::cout << "Magic activated: " << magicB->getType() << "\n";
-        animalBRoll = magicB->applyEffect(animalBRoll, animalARoll);
-    } else {
-        std::cout << "Magic failed.\n";
-    }
-
-    delete magicB;
-}
-    } catch (const FileOpenException& ex) {
-        std::cout << "File error: " << ex.what() << "\n";
-    } catch (const FileDataException& ex) {
-        std::cout << "Saved data error: " << ex.what() << "\n";
-    } catch (const FileValidationException& ex) {
-        std::cout << ex.what() << "\n";
-    } catch (const std::exception& ex) {
-        std::cout << "Unexpected error: " << ex.what() << "\n";
-    }
-}
-
-// Prints one or more saved series records in a readable format.
-void printHistoryRecords(const std::vector<SeriesRecord>& records) {
-    if (records.empty()) {
-        std::cout << "No match history found.\n";
-        return;
-    }
-
-    for (std::size_t recordIndex = 0; recordIndex < records.size(); ++recordIndex) {
-        const SeriesRecord& record = records[recordIndex];
-        std::cout << "\nSeries " << recordIndex + 1 << ": " << record.animalA << " vs "
-                  << record.animalB << " -> " << record.seriesWinner << " won "
-                  << record.animalAWins << "-" << record.animalBWins << "\n";
-
-        for (std::size_t gameIndex = 0; gameIndex < record.games.size(); ++gameIndex) {
-            const GameResult& game = record.games[gameIndex];
-            std::cout << "  Game " << gameIndex + 1 << ": " << game.winnerName
-                      << " won with " << game.winnerRoll << " over "
-                      << game.loserName << "'s " << game.loserRoll << "\n";
-        }
-    }
-}
-
-// Looks up one animal by name and shows both its die values
-// and its saved win/loss stats.
-void viewAnimalRecord() {
-    try {
-        printDivider();
-        std::cout << "Animal Record Lookup\n";
-
-        const std::vector<AnimalDieData> animals = loadAnimalDice(kAnimalFile);
-        const std::vector<AnimalRecord> records = loadAnimalRecords(kStatsFile);
-        if (animals.empty()) {
-            std::cout << "No saved animal dice were found.\n";
+        if (animalExists(animals, name)) {
+            std::cout << "An animal die with that name already exists.\n";
             return;
         }
 
-        const std::string requestedName = normalizeAnimalName(promptForText("Enter animal name: "));
-        const AnimalRecord* record = findAnimalRecord(records, requestedName);
+        std::array<int, 6> sides = { 0, 0, 0, 0, 0, 0 };
+        for (int i = 0; i < 6; ++i) {
+            sides[i] = promptForInteger("Enter value for side " + std::to_string(i + 1) + ": ", 1, 99);
+        }
 
-        const AnimalDieData* animal = nullptr;
-        // Find the actual die so its 6 side values can be displayed.
-        for (const AnimalDieData& current : animals) {
-            if (namesMatch(current.name, requestedName)) {
-                animal = &current;
-                break;
+        AnimalDieData newAnimal{ name, sides };
+        appendAnimalDie(kAnimalFile, newAnimal);
+        std::cout << "Animal die \"" << name << "\" created and saved.\n";
+    }
+
+    // Displays all animal dice currently saved in the ZooBox file
+    void viewAnimalDice() {
+        std::vector<AnimalDieData> animals = loadAnimalDice(kAnimalFile);
+        if (animals.empty()) {
+            std::cout << "\nNo animal dice found. Please create some first.\n";
+            return;
+        }
+        std::cout << "\nCurrent Animal Dice:\n";
+        for (std::size_t i = 0; i < animals.size(); ++i) {
+            std::cout << i + 1 << ". " << formatSideValues(animals[i]) << "\n";
+        }
+    }
+
+    // Displays the match history menu and allows the user to view all matches or filter by animal name
+    void viewMatchHistoryMenu() {
+        const std::string kHistoryFile = "Results.txt";
+        const std::string kStatsFile = "AnimalRecords.txt";
+
+        std::vector<SeriesRecord> history = loadSeriesHistory(kHistoryFile);
+        if (history.empty()) {
+            std::cout << "\nNo match history found.\n";
+            return;
+        }
+
+        std::cout << "\nMatch History Menu\n";
+        std::cout << "1. View all matches\n";
+        std::cout << "2. Look up animal stats\n";
+        std::cout << "0. Return to main menu\n";
+        std::cout << "Choose an option: ";
+
+        int choice;
+        while (!(std::cin >> choice) || choice < 0 || choice > 2) {
+            std::cout << "Please enter a number from 0 to 2: ";
+            std::cin.clear();
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        }
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+        if (choice == 1) {
+            std::cout << "\nAll Matches:\n";
+            for (std::size_t i = 0; i < history.size(); ++i) {
+                const SeriesRecord& rec = history[i];
+                std::cout << "Match " << i + 1 << ": " << rec.animalA << " vs " << rec.animalB
+                    << " | Winner: " << rec.seriesWinner
+                    << " (" << rec.animalAWins << "-" << rec.animalBWins << ")\n";
+            }
+        } else if (choice == 2) {
+            std::cout << "\nEnter animal name to look up: ";
+            std::string name;
+            std::getline(std::cin, name);
+            name = normalizeAnimalName(name);
+
+            std::vector<SeriesRecord> filtered = filterSeriesByAnimal(history, name);
+            if (filtered.empty()) {
+                std::cout << "No matches found for \"" << name << "\".\n";
+            } else {
+                std::cout << "\nMatches for " << name << ":\n";
+                for (std::size_t i = 0; i < filtered.size(); ++i) {
+                    const SeriesRecord& rec = filtered[i];
+                    std::cout << "Match " << i + 1 << ": " << rec.animalA << " vs " << rec.animalB
+                        << " | Winner: " << rec.seriesWinner
+                        << " (" << rec.animalAWins << "-" << rec.animalBWins << ")\n";
+                }
+            }
+
+            std::vector<AnimalRecord> stats = loadAnimalRecords(kStatsFile);
+            const AnimalRecord* rec = findAnimalRecord(stats, name);
+            if (rec) {
+                std::cout << "\nStats for " << rec->name << ":\n";
+                std::cout << "  Series Wins: " << rec->seriesWins << "\n";
+                std::cout << "  Series Losses: " << rec->seriesLosses << "\n";
+                std::cout << "  Game Wins: " << rec->gameWins << "\n";
+                std::cout << "  Game Losses: " << rec->gameLosses << "\n";
+                std::cout << "  Average Roll: ";
+                if (rec->rollCount > 0)
+                    std::cout << std::fixed << std::setprecision(2) << computeAverageRoll(*rec) << "\n";
+                else
+                    std::cout << "N/A\n";
+            } else {
+                std::cout << "No stats found for \"" << name << "\".\n";
+            }
+        }
+        // If choice == 0, just return to main menu
+    }
+
+    //  MAIN, where the magic happens, aka the main menu loop and function calls, also initializes random seed for die rolls
+
+    int main() {
+        srand(static_cast<unsigned int>(time(nullptr)));
+
+        bool running = true;
+        printTitle();
+
+        while (running) {
+            printMainMenu();
+            int choice = promptForInteger("", 0, 4);
+
+            if (choice == 1) {
+                fightAnimals();
+                waitForEnter();
+            }
+            else if (choice == 2) {
+                createDie();
+                waitForEnter();
+            }
+            else if (choice == 3) {
+                viewAnimalDice();
+                waitForEnter();
+            }
+            else if (choice == 4) {
+                viewMatchHistoryMenu();
+                waitForEnter();
+            }
+            else if (choice == 0) {
+                running = false;
             }
         }
 
-        if (animal == nullptr) {
-            throw FileValidationException("That animal was not found.");
-        }
-
-        std::cout << formatSideValues(*animal) << "\n";
-
-        if (record == nullptr) {
-            std::cout << "Series Record: 0-0\n";
-            std::cout << "Series Win Rate: No completed series yet\n";
-            std::cout << "Game Record: 0-0\n";
-            std::cout << "Game Win Rate: No counted games yet\n";
-            std::cout << "Average Roll: No counted games yet\n";
-        } else {
-            // Convert win/loss totals into percentages for display.
-            const int totalSeries = record->seriesWins + record->seriesLosses;
-            const int totalGames = record->gameWins + record->gameLosses;
-            const double seriesWinRate = (totalSeries == 0)
-                ? 0.0
-                : (static_cast<double>(record->seriesWins) / static_cast<double>(totalSeries)) * 100.0;
-            const double gameWinRate = (totalGames == 0)
-                ? 0.0
-                : (static_cast<double>(record->gameWins) / static_cast<double>(totalGames)) * 100.0;
-
-            std::cout << "Series Record: " << record->seriesWins << "-" << record->seriesLosses << "\n";
-            std::cout << std::fixed << std::setprecision(2)
-                      << "Series Win Rate: " << seriesWinRate << "%\n";
-            std::cout << "Game Record: " << record->gameWins << "-" << record->gameLosses << "\n";
-            std::cout << "Game Win Rate: " << gameWinRate << "%\n";
-            // Average Roll is based on real battle rolls that were recorded,
-            // not the average of the die's 6 side values.
-            std::cout << std::fixed << std::setprecision(2)
-                      << "Average Roll: " << computeAverageRoll(*record) << "\n";
-        }
-    } catch (const FileDataException& ex) {
-        std::cout << "Saved data error: " << ex.what() << "\n";
-    } catch (const FileValidationException& ex) {
-        std::cout << ex.what() << "\n";
-    } catch (const std::exception& ex) {
-        std::cout << "Unexpected error: " << ex.what() << "\n";
-    }
-}
-
-// Shows the submenu for match history and animal stat lookup.
-void viewMatchHistoryMenu() {
-    try {
+        // Cleanup and exit 
         printDivider();
-        std::cout << "History And Stats\n";
-        std::cout << "1. View all match history\n";
-        std::cout << "2. Filter match history by animal\n";
-        std::cout << "3. Look up animal stats\n";
-        std::cout << "0. Back\n";
-
-        const int choice = promptForInteger("Choose an option: ", 0, 3);
-        if (choice == 0) {
-            return;
-        }
-
-        if (choice == 1) {
-            printDivider();
-            std::cout << "All Match History\n";
-            printHistoryRecords(loadSeriesHistory(kHistoryFile));
-        } else if (choice == 2) {
-            printDivider();
-            std::cout << "Filtered Match History\n";
-            const std::string animalName = normalizeAnimalName(promptForText("Enter animal name: "));
-            const std::vector<SeriesRecord> allRecords = loadSeriesHistory(kHistoryFile);
-            printHistoryRecords(filterSeriesByAnimal(allRecords, animalName));
-        } else {
-            viewAnimalRecord();
-        }
-    } catch (const FileDataException& ex) {
-        std::cout << "Saved data error: " << ex.what() << "\n";
-    } catch (const std::exception& ex) {
-        std::cout << "Unexpected error: " << ex.what() << "\n";
+        std::cout << "Closing prototype.\n";
+        return 0;
     }
-}
-
-}
-
-// Starts the program, seeds the random number generator,
-// shows the menu, and keeps running until the user chooses Exit.
-int main() {
-    // Seed rand() once so the rolls are different each time the program runs.
-    srand(static_cast<unsigned int>(time(nullptr)));
-
-    bool running = true;
-    printTitle();
-
-    // Keep showing the menu until the user chooses to quit.
-    while (running) {
-        printMainMenu();
-        int choice = promptForInteger("", 0, 4);
-
-        if (choice == 1) {
-            fightAnimals();
-            waitForEnter();
-        } else if (choice == 2) {
-            createDie();
-            waitForEnter();
-        } else if (choice == 3) {
-            viewAnimalDice();
-            waitForEnter();
-        } else if (choice == 4) {
-            viewMatchHistoryMenu();
-            waitForEnter();
-        } else if (choice == 0) {
-            running = false;
-        }
-    }
-
-    printDivider();
-    std::cout << "Closing prototype.\n";
-    return 0;
-}
+} // closing brace for name space
