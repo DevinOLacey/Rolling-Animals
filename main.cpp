@@ -281,7 +281,47 @@ void fightAnimals() {
 
         std::cout << "Series history and animal records saved.\n";
 
-        // TODO: Add magic die effect when they are implemented.
+        
+        // --- MAGIC PHASE ---
+
+    std::cout << animalA.name << " choose magic die (0 for none):\n";
+    int choiceA = promptForInteger("", 0, 9);
+
+    MagicDice* magicA = createMagicDice(choiceA);
+
+    if (magicA) {
+        int roll = magicA->rollActivation();
+        std::cout << animalA.name << " rolled " << roll << " for magic activation.\n";
+
+    if (magicA->checkActivation(roll)) {
+        std::cout << "Magic activated: " << magicA->getType() << "\n";
+        animalARoll = magicA->applyEffect(animalARoll, animalBRoll);
+    } else {
+        std::cout << "Magic failed.\n";
+    }
+
+    delete magicA;
+    }
+
+// SAME FOR PLAYER B
+    std::cout << animalB.name << " choose magic die (0 for none):\n";
+    int choiceB = promptForInteger("", 0, 9);
+
+    MagicDice* magicB = createMagicDice(choiceB);
+
+    if (magicB) {
+        int roll = magicB->rollActivation();
+        std::cout << animalB.name << " rolled " << roll << " for magic activation.\n";
+
+    if (magicB->checkActivation(roll)) {
+        std::cout << "Magic activated: " << magicB->getType() << "\n";
+        animalBRoll = magicB->applyEffect(animalBRoll, animalARoll);
+    } else {
+        std::cout << "Magic failed.\n";
+    }
+
+    delete magicB;
+}
     } catch (const FileOpenException& ex) {
         std::cout << "File error: " << ex.what() << "\n";
     } catch (const FileDataException& ex) {
