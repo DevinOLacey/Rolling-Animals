@@ -39,9 +39,13 @@ struct AnimalDieData {
 // It keeps the winner, loser, and the roll each one got.
 struct GameResult {
     std::string winnerName;
-    int winnerRoll;
+    int winnerRoll = 0;
     std::string loserName;
-    int loserRoll;
+    int loserRoll = 0;
+
+    GameResult() = default;
+    GameResult(const std::string& wName, int wRoll, const std::string& lName, int lRoll)
+        : winnerName(wName), winnerRoll(wRoll), loserName(lName), loserRoll(lRoll) {}
 };
 
 // Stores one finished best-of-3 match between two animals.
@@ -50,8 +54,8 @@ struct SeriesRecord {
     std::string seriesWinner;
     std::string animalA;
     std::string animalB;
-    int animalAWins;
-    int animalBWins;
+    int animalAWins = 0;
+    int animalBWins = 0;
     std::vector<GameResult> games;
 };
 
