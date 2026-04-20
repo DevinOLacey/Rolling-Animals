@@ -54,7 +54,8 @@ namespace {
                 if (choice == 'n' || choice == 'N') {
                     return false;
                 }
-            } else {
+            }
+            else {
                 std::cin.clear();
                 std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
             }
@@ -127,7 +128,20 @@ namespace {
         return animal.sideValues[index];
     }
 
-  
+	// allows the player to choose a magic die from the list of available options, returns the choice as an integer (0 for none, 1-7 for the different magic dice)
+    int chooseMagicOption(const std::string& playerName) {
+        std::cout << "\n" << playerName << " choose a magic die:\n";
+        std::cout << "1. Boost (+1)\n";
+        std::cout << "2. Shield (defensive)\n";
+        std::cout << "3. Flip (invert roll)\n";
+        std::cout << "4. Reroll\n";
+        std::cout << "5. Pillar (add half)\n";
+        std::cout << "6. Mirror (copy opponent)\n";
+        std::cout << "7. Break (cancel opponent)\n";
+        std::cout << "0. None\n";
+
+        return promptForInteger("Choice: ", 0, 7);
+    }
 
     // FIGHT LOGIC, runs a best of three series between two animal dice, with the new magic die mechanics integrated, and returns a record of the series for storage in the match history
 
@@ -138,7 +152,7 @@ namespace {
         record.animalAWins = 0;
         record.animalBWins = 0;
 
-        // 🔥 NEW: magic cooldown tracking
+        // magic cooldown tracking
         bool aUsedMagic = false;
         bool bUsedMagic = false;
 
@@ -177,8 +191,18 @@ namespace {
                 std::cout << animalB.name << " has already used magic this series.\n";
             }
 
-            MagicDice* magicA = useMagicA ? createRandomMagicDice() : nullptr;
-            MagicDice* magicB = useMagicB ? createRandomMagicDice() : nullptr;
+            MagicDice* magicA = nullptr;
+            MagicDice* magicB = nullptr;
+
+            if (useMagicA) {
+                int choiceA = chooseMagicOption(animalA.name);
+                magicA = createMagicDice(choiceA);
+            }
+
+            if (useMagicB) {
+                int choiceB = chooseMagicOption(animalB.name);
+                magicB = createMagicDice(choiceB);
+            }
 
             bool aActive = false;
             bool bActive = false;
@@ -391,7 +415,8 @@ namespace {
                     << " | Winner: " << rec.seriesWinner
                     << " (" << rec.animalAWins << "-" << rec.animalBWins << ")\n";
             }
-        } else if (choice == 2) {
+        }
+        else if (choice == 2) {
             std::cout << "\nEnter animal name to look up: ";
             std::string name;
             std::getline(std::cin, name);
@@ -400,7 +425,8 @@ namespace {
             std::vector<SeriesRecord> filtered = filterSeriesByAnimal(history, name);
             if (filtered.empty()) {
                 std::cout << "No matches found for \"" << name << "\".\n";
-            } else {
+            }
+            else {
                 std::cout << "\nMatches for " << name << ":\n";
                 for (std::size_t i = 0; i < filtered.size(); ++i) {
                     const SeriesRecord& rec = filtered[i];
@@ -423,7 +449,8 @@ namespace {
                     std::cout << std::fixed << std::setprecision(2) << computeAverageRoll(*rec) << "\n";
                 else
                     std::cout << "N/A\n";
-            } else {
+            }
+            else {
                 std::cout << "No stats found for \"" << name << "\".\n";
             }
         }
@@ -466,6 +493,10 @@ int main() {
     }
 
     // Cleanup and exit
+    printDivider();
+    std::cout << "Closing prototype.\n";
+    return 0;
+}
     printDivider();
     std::cout << "Closing prototype.\n";
     return 0;
