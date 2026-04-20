@@ -1,50 +1,32 @@
-#ifndef OPPONENT_DICE_H
-#define OPPONENT_DICE_H
+#ifndef OPP_DICE_H
+#define OPP_DICE_H
 
 #include "MagicDice.h"
 
-// Base for opponent-interaction dice
-class OpponentDice : public MagicDice {
+// Mirror swaps the player's rolls, so the player's roll becomes the opponent's and vice versa.
+class MirrorDice : public MagicDice {
 public:
-    std::string getType() const override {
-        return "Opponent";
+    int applyEffect(int playerRoll, int opponentRoll) const override {
+        return playerRoll; // handled in main
     }
+
+    std::string getType() const override { return "Swap"; }
+    std::string getCategory() const override { return "Opponent"; }
+
+    bool isMirror() const override { return true; }
 };
 
-// MIRROR
-class MirrorDice : public OpponentDice {
+// Break cancels the opponent's magic die effect, so the opponent's roll is unaffected by their magic die.
+class BreakDice : public MagicDice {
 public:
-    int applyEffect(int, int opponentRoll) const override {
-        return opponentRoll;
+    int applyEffect(int playerRoll, int opponentRoll) const override {
+        return playerRoll; // handled in main
     }
 
-    std::string getType() const override {
-        return "Mirror";
-    }
-};
+    std::string getType() const override { return "Break"; }
+    std::string getCategory() const override { return "Opponent"; }
 
-// SWAP
-class SwapDice : public OpponentDice {
-public:
-    int applyEffect(int, int opponentRoll) const override {
-        return opponentRoll;
-    }
-
-    std::string getType() const override {
-        return "Swap";
-    }
-};
-
-// BREAK
-class BreakDice : public OpponentDice {
-public:
-    int applyEffect(int playerRoll, int) const override {
-        return playerRoll;
-    }
-
-    std::string getType() const override {
-        return "Break";
-    }
+    bool isBreak() const override { return true; }
 };
 
 #endif
