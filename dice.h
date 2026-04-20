@@ -17,21 +17,16 @@ class Die {
 protected:
     int sides;
 public:
-   Die(int s = 6) : sides(s) {}
+    Die(int s);
     virtual ~Die() = default;
 
-    virtual int roll() const {
-        return (rand() % sides) + 1;
-    }
-    // maybe all this V
+    virtual int roll() const;
     int getSides() const { return sides; }
     virtual std::string getType() const { return "Standard"; }
 
     virtual void printInfo() const {
         std::cout << getType() << " Die (" << sides << " sides)\n";
     }
-    // maybe all this^
-    // in animaldie class idk
 };
 
 #endif
