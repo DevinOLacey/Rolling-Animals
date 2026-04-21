@@ -497,7 +497,3 @@ int main() {
     std::cout << "Closing prototype.\n";
     return 0;
 }
-    printDivider();
-    std::cout << "Closing prototype.\n";
-    return 0;
-}

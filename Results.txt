@@ -6,3 +6,4 @@ series_winner:Dog animal_a:Dog animal_b:Cat score:2-1 games:[Cat|9|Dog|3,Dog|6|C
 series_winner:Bird animal_a:Bird animal_b:Dog score:2-0 games:[Bird|4|Dog|3,Bird|4|Dog|2]
 series_winner:Rattle_Snake animal_a:Rattle_Snake animal_b:Bird score:2-0 games:[Rattle_Snake|8|Bird|4,Rattle_Snake|8|Bird|4]
 series_winner:Rattle_Snake animal_a:Rattle_Snake animal_b:Cat score:2-1 games:[Cat|9|Rattle_Snake|2,Rattle_Snake|8|Cat|1,Rattle_Snake|8|Cat|1]
+series_winner:Dog animal_a:Polar_Bear animal_b:Dog score:1-2 games:[Polar_Bear|10|Dog|3,Dog|6|Polar_Bear|5,Dog|6|Polar_Bear|3]

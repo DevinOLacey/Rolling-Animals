@@ -3,3 +3,4 @@ name:Dog sides:2,2,3,3,6,6
 name:Cat sides:1,1,1,1,9,9
 name:Bird sides:4,4,4,4,5,5
 name:Rattle_Snake sides:2,2,2,8,8,8
+name:Polar_Bear sides:4,5,3,5,4,10
